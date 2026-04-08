@@ -29,11 +29,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   for (const doc of docs) {
     try {
+      console.log(`[process] extracting: ${doc.fileName} (${doc.docType})`)
       const extracted = await extractDocument(doc.blobUrl, doc.fileName, doc.docType)
+      console.log(`[process] done: ${doc.fileName}`, JSON.stringify(extracted).slice(0, 200))
       await JobDocument.findByIdAndUpdate(doc._id, { extractedData: extracted, processed: true })
       processedDocs.push({ docType: doc.docType, extractedData: extracted })
     } catch (e) {
-      errors.push({ docId: doc._id, error: String(e) })
+      console.error(`[process] FAILED: ${doc.fileName}`, String(e))
+      errors.push({ file: doc.fileName, error: String(e) })
     }
   }
 

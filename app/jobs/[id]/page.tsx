@@ -160,7 +160,14 @@ export default function JobDetailPage() {
         )}
         {processResult && (
           <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-            n8n processing complete — {String(processResult.documentsProcessed)} doc(s) processed, {String(processResult.materialsItems)} materials items generated.
+            AI processing complete — {String(processResult.documentsProcessed)} doc(s) processed, {String(processResult.materialsItems)} materials items generated.
+            {Array.isArray(processResult.errors) && processResult.errors.length > 0 && (
+              <div className="mt-2 text-red-600">
+                {(processResult.errors as Array<{file: string; error: string}>).map((e, i) => (
+                  <div key={i}>⚠ {e.file}: {e.error}</div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
