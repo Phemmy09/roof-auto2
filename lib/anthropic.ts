@@ -1,10 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { PDFDocument } from 'pdf-lib'
 
 export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const PROMPT = (docType: string, fileName: string) =>
-  `You are a roofing estimator AI. Extract all relevant data from this ${docType} document.
+  `You are a roofing estimator AI. Extract all relevant data from this ${docType} document text.
 Return a JSON object with these fields (use null if not found):
 {
   "squares": number,
@@ -43,13 +42,50 @@ function mergeTwo(a: Record<string, unknown>, b: Record<string, unknown>) {
   return out
 }
 
-// Send PDF bytes directly to Claude as a base64 document
-async function extractFromPdfBytes(
-  pdfBytes: Buffer,
+// Extract text from PDF buffer using pdfjs-dist (works in Node.js serverless)
+async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    useSystemFonts: true,
+    disableFontFace: true,
+  })
+  const pdf = await loadingTask.promise
+  let text = ''
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    text += content.items.map((item: any) => item.str).join(' ') + '\n'
+  }
+  return text.trim()
+}
+
+// Send extracted text to Claude
+async function extractFromText(
+  text: string,
   fileName: string,
   docType: string
 ): Promise<Record<string, unknown>> {
-  const base64 = pdfBytes.toString('base64')
+  const res = await anthropic.messages.create({
+    model: 'claude-opus-4-6',
+    max_tokens: 2048,
+    messages: [{
+      role: 'user',
+      content: `${PROMPT(docType, fileName)}\n\nDocument text:\n${text}`,
+    }],
+  })
+  return parseJson(res.content[0].type === 'text' ? res.content[0].text : '{}')
+}
+
+// Send small PDF as base64 to Claude vision (fallback for image-based PDFs)
+async function extractFromBase64(
+  buffer: Buffer,
+  fileName: string,
+  docType: string
+): Promise<Record<string, unknown>> {
+  const base64 = buffer.toString('base64')
   const res = await anthropic.messages.create({
     model: 'claude-opus-4-6',
     max_tokens: 2048,
@@ -62,48 +98,9 @@ async function extractFromPdfBytes(
       ],
     }],
   })
-  const raw = res.content[0].type === 'text' ? res.content[0].text : '{}'
-  return parseJson(raw)
+  return parseJson(res.content[0].type === 'text' ? res.content[0].text : '{}')
 }
 
-// Split large PDFs into chunks and process each
-async function extractFromLargePdf(
-  pdfBytes: Buffer,
-  fileName: string,
-  docType: string,
-  chunkSize = 8
-): Promise<Record<string, unknown>> {
-  const srcDoc = await PDFDocument.load(pdfBytes)
-  const totalPages = srcDoc.getPageCount()
-  let combined: Record<string, unknown> = {}
-
-  console.log(`[extract] ${fileName}: splitting ${totalPages} pages into chunks of ${chunkSize}`)
-
-  for (let start = 0; start < totalPages; start += chunkSize) {
-    const end = Math.min(start + chunkSize, totalPages)
-    const chunkDoc = await PDFDocument.create()
-    const indices = Array.from({ length: end - start }, (_, i) => start + i)
-    const pages = await chunkDoc.copyPages(srcDoc, indices)
-    pages.forEach(p => chunkDoc.addPage(p))
-    const chunkBytes = Buffer.from(await chunkDoc.save())
-    const chunkName = `${fileName} (pages ${start + 1}-${end} of ${totalPages})`
-
-    console.log(`[extract] processing chunk: pages ${start + 1}-${end}`)
-    const result = await extractFromPdfBytes(chunkBytes, chunkName, docType)
-    combined = mergeTwo(combined, result)
-
-    // Stop early if all key measurements found
-    const keys = ['squares', 'pitch', 'ridges', 'hips', 'valleys', 'rakes', 'eaves']
-    if (keys.every(k => combined[k] !== null && combined[k] !== undefined)) {
-      console.log(`[extract] all measurements found, stopping early at page ${end}`)
-      break
-    }
-  }
-
-  return combined
-}
-
-// Main entry — handles any PDF size
 export async function extractDocument(
   blobUrl: string,
   fileName: string,
@@ -111,23 +108,52 @@ export async function extractDocument(
 ): Promise<Record<string, unknown>> {
   console.log(`[extract] downloading: ${fileName}`)
   const res = await fetch(blobUrl)
-  if (!res.ok) throw new Error(`Failed to fetch blob: ${res.status}`)
+  if (!res.ok) throw new Error(`Failed to fetch blob (${res.status}): ${blobUrl}`)
 
-  const pdfBytes = Buffer.from(await res.arrayBuffer())
-  const sizeMb = pdfBytes.byteLength / 1024 / 1024
-  console.log(`[extract] ${fileName}: ${sizeMb.toFixed(1)} MB`)
+  const buffer = Buffer.from(await res.arrayBuffer())
+  const sizeMb = (buffer.byteLength / 1024 / 1024).toFixed(1)
+  console.log(`[extract] ${fileName}: ${sizeMb} MB`)
 
-  if (sizeMb <= 20) {
-    // Send whole PDF directly to Claude
-    console.log(`[extract] ${fileName}: sending to Claude directly`)
-    return await extractFromPdfBytes(pdfBytes, fileName, docType)
+  // Step 1: try text extraction
+  try {
+    const text = await extractTextFromBuffer(buffer)
+    if (text.length > 200) {
+      console.log(`[extract] ${fileName}: text extracted (${(text.length / 1024).toFixed(1)} KB) → sending to Claude`)
+      return await extractFromText(text, fileName, docType)
+    }
+    console.log(`[extract] ${fileName}: text too short (${text.length} chars), trying vision`)
+  } catch (e) {
+    console.log(`[extract] ${fileName}: text extraction failed (${String(e).slice(0, 100)}), trying vision`)
   }
 
-  // Large file — split into chunks
-  return await extractFromLargePdf(pdfBytes, fileName, docType)
+  // Step 2: image-based PDF — send as base64 (only if under 20 MB)
+  if (buffer.byteLength <= 20 * 1024 * 1024) {
+    console.log(`[extract] ${fileName}: sending as base64 vision`)
+    return await extractFromBase64(buffer, fileName, docType)
+  }
+
+  // Step 3: large image PDF — split into chunks
+  console.log(`[extract] ${fileName}: too large for vision, splitting into chunks`)
+  const { PDFDocument } = await import('pdf-lib')
+  const srcDoc = await PDFDocument.load(buffer)
+  const totalPages = srcDoc.getPageCount()
+  let combined: Record<string, unknown> = {}
+
+  for (let start = 0; start < totalPages; start += 8) {
+    const end = Math.min(start + 8, totalPages)
+    const chunkDoc = await PDFDocument.create()
+    const indices = Array.from({ length: end - start }, (_, i) => start + i)
+    const pages = await chunkDoc.copyPages(srcDoc, indices)
+    pages.forEach(p => chunkDoc.addPage(p))
+    const chunkBytes = Buffer.from(await chunkDoc.save())
+    const result = await extractFromBase64(chunkBytes, `${fileName} (pages ${start + 1}-${end})`, docType)
+    combined = mergeTwo(combined, result)
+    const keys = ['squares', 'pitch', 'ridges', 'hips', 'valleys', 'rakes', 'eaves']
+    if (keys.every(k => combined[k] !== null && combined[k] !== undefined)) break
+  }
+  return combined
 }
 
-// Merge results from all documents (eagle_view takes priority)
 export function mergeExtractedData(
   docs: Array<{ docType: string; extractedData: Record<string, unknown> }>
 ) {
