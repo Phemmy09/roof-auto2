@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { upload } from '@vercel/blob/client'
 import { IJob, IDocument, IMaterialsOrder, ICrewOrder } from '@/types'
 import StatusBadge from '@/components/StatusBadge'
 import { Upload, Zap, Trash2, ArrowLeft, CheckCircle, FileText } from 'lucide-react'
@@ -22,6 +23,7 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<JobData | null>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
   const [uploadingType, setUploadingType] = useState<string | null>(null)
   const [processResult, setProcessResult] = useState<Record<string, unknown> | null>(null)
   const [processError, setProcessError] = useState('')
@@ -39,10 +41,22 @@ export default function JobDetailPage() {
     if (!files || files.length === 0) return
     setUploadingType(docType)
     for (const file of Array.from(files)) {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('doc_type', docType)
-      await fetch(`/api/jobs/${id}/documents`, { method: 'POST', body: fd })
+      // Upload directly from browser to Vercel Blob — no server size limit
+      const blob = await upload(`jobs/${id}/${docType}_${Date.now()}_${file.name}`, file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+      })
+      // Save the blob URL + metadata to MongoDB
+      await fetch(`/api/jobs/${id}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          blobUrl: blob.url,
+          fileName: file.name,
+          mimeType: file.type || 'application/pdf',
+          docType,
+        }),
+      })
     }
     await load()
     setUploadingType(null)
@@ -51,18 +65,28 @@ export default function JobDetailPage() {
 
   async function handleProcess() {
     setProcessing(true)
+    setElapsed(0)
     setProcessError('')
     setProcessResult(null)
-    const res = await fetch(`/api/jobs/${id}/process`, { method: 'POST' })
-    const data = await res.json()
-    if (res.ok) {
-      setProcessResult(data)
-    } else {
-      setProcessError(data.error || 'Processing failed')
+
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000)
+
+    try {
+      const res = await fetch(`/api/jobs/${id}/process`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setProcessResult(data)
+      } else {
+        setProcessError(data.error || 'Processing failed')
+      }
+      await load()
+    } finally {
+      clearInterval(timer)
+      setProcessing(false)
     }
-    await load()
-    setProcessing(false)
   }
+
+  const formatElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
   async function handleDeleteDoc(docId: string) {
     await fetch(`/api/jobs/${id}/documents/${docId}`, { method: 'DELETE' })
@@ -102,20 +126,32 @@ export default function JobDetailPage() {
             <button
               onClick={handleProcess}
               disabled={processing}
-              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 min-w-[180px] justify-center"
             >
               <Zap size={14} />
-              {processing ? 'Processing with AI...' : 'Process All with AI'}
+              {processing ? `Processing... ${formatElapsed(elapsed)}` : 'Process All with n8n'}
             </button>
           )}
         </div>
 
+        {processing && (
+          <div className="mb-4 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-3">
+            <svg className="animate-spin h-4 w-4 text-blue-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+            <div>
+              <p className="font-medium">Sending documents to n8n for processing...</p>
+              <p className="text-xs text-blue-500 mt-0.5">This can take up to 5 minutes. Do not close this page. ({formatElapsed(elapsed)} elapsed)</p>
+            </div>
+          </div>
+        )}
         {processError && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{processError}</div>
         )}
         {processResult && (
           <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-            AI processing complete — {String(processResult.documentsProcessed)} doc(s) processed, {String(processResult.materialsItems)} materials items generated.
+            n8n processing complete — {String(processResult.documentsProcessed)} doc(s) processed, {String(processResult.materialsItems)} materials items generated.
           </div>
         )}
 

@@ -1,30 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
 import { connectDB } from '@/lib/mongodb'
 import JobDocument from '@/models/Document'
 
 type Params = { params: { id: string } }
 
+// The browser uploads the file directly to Vercel Blob and sends us
+// just the resulting blobUrl + metadata — no file bytes pass through here.
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     await connectDB()
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    const docType = formData.get('doc_type') as string
+    const body = await req.json()
+    const { blobUrl, fileName, mimeType, docType } = body
 
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-
-    // Upload to Vercel Blob (no size limits like MongoDB)
-    const blob = await put(`jobs/${params.id}/${docType}_${Date.now()}_${file.name}`, file, {
-      access: 'public',
-    })
+    if (!blobUrl || !fileName || !docType) {
+      return NextResponse.json({ error: 'Missing blobUrl, fileName or docType' }, { status: 400 })
+    }
 
     const doc = await JobDocument.create({
       jobId: params.id,
-      fileName: file.name,
+      fileName,
       docType,
-      mimeType: file.type || 'application/pdf',
-      blobUrl: blob.url,
+      mimeType: mimeType || 'application/pdf',
+      blobUrl,
     })
 
     return NextResponse.json(doc.toObject(), { status: 201 })

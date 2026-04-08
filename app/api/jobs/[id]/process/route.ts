@@ -9,6 +9,8 @@ import { extractDocument, mergeExtractedData } from '@/lib/anthropic'
 import { runFormulaEngine } from '@/lib/formula-engine'
 import { Measurements } from '@/types'
 
+export const maxDuration = 300
+
 type Params = { params: { id: string } }
 
 export async function POST(_req: NextRequest, { params }: Params) {
@@ -38,18 +40,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const merged = mergeExtractedData(processedDocs)
   await Job.findByIdAndUpdate(params.id, { extractedData: merged })
 
-  // Run formulas
   const formulas = await Formula.find({ active: true }).sort({ sortOrder: 1 }).lean()
   const measurements: Measurements = {
-    squares: Number(merged.squares) || 0,
-    pitch: Number(merged.pitch) || 0,
-    ridges: Number(merged.ridges) || 0,
-    hips: Number(merged.hips) || 0,
-    valleys: Number(merged.valleys) || 0,
-    rakes: Number(merged.rakes) || 0,
-    eaves: Number(merged.eaves) || 0,
+    squares:    Number(merged.squares)    || 0,
+    pitch:      Number(merged.pitch)      || 0,
+    ridges:     Number(merged.ridges)     || 0,
+    hips:       Number(merged.hips)       || 0,
+    valleys:    Number(merged.valleys)    || 0,
+    rakes:      Number(merged.rakes)      || 0,
+    eaves:      Number(merged.eaves)      || 0,
     pipe_boots: Number(merged.pipe_boots) || 0,
-    vents: Number(merged.vents) || 0,
+    vents:      Number(merged.vents)      || 0,
   }
 
   const items = runFormulaEngine(

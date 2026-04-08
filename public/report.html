@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roof Auto — Project Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      padding: 40px 20px;
+    }
+
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: white;
+      padding: 48px 48px 36px;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: #93c5fd; }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .header h1 {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .header p {
+      font-size: 16px;
+      color: #bfdbfe;
+      max-width: 560px;
+      line-height: 1.6;
+    }
+    .meta {
+      margin-top: 28px;
+      display: flex;
+      gap: 32px;
+      font-size: 13px;
+      color: #93c5fd;
+    }
+    .meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Body ── */
+    .body { padding: 48px; }
+
+    /* Section */
+    .section { margin-bottom: 44px; }
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e0e7ff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title .num {
+      background: #2563eb;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section p {
+      font-size: 15px;
+      line-height: 1.75;
+      color: #374151;
+      margin-bottom: 12px;
+    }
+
+    /* Problem / Solution cards */
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .card {
+      border-radius: 10px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    .card.problem {
+      background: #fef2f2;
+      border-left: 4px solid #ef4444;
+    }
+    .card.solution {
+      background: #f0fdf4;
+      border-left: 4px solid #22c55e;
+    }
+    .card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .card.problem h4 { color: #dc2626; }
+    .card.solution h4 { color: #16a34a; }
+    .card ul { padding-left: 16px; color: #374151; }
+    .card ul li { margin-bottom: 5px; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-top: 14px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    thead tr { background: #1e3a5f; color: white; }
+    thead th { padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px; }
+    tbody tr { border-bottom: 1px solid #e5e7eb; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: #f8faff; }
+    tbody td { padding: 11px 16px; color: #374151; vertical-align: top; }
+    td strong { color: #1e3a5f; }
+
+    /* Feature grid */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .feature {
+      background: #f8faff;
+      border: 1px solid #e0e7ff;
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .feature .icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    .feature h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 6px;
+    }
+    .feature p {
+      font-size: 13px !important;
+      color: #6b7280 !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* Tech stack */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .tech-item {
+      background: #f8faff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      border: 1px solid #e0e7ff;
+    }
+    .tech-item .layer {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #2563eb;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .tech-item .name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 4px;
+    }
+    .tech-item .why {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    /* Highlight box */
+    .highlight {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-top: 14px;
+    }
+    .highlight p {
+      font-size: 14px !important;
+      color: #1e40af !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* Security */
+    .security-list {
+      list-style: none;
+      margin-top: 14px;
+    }
+    .security-list li {
+      padding: 10px 16px;
+      font-size: 14px;
+      color: #374151;
+      border-left: 3px solid #2563eb;
+      background: #f8faff;
+      margin-bottom: 8px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    /* Next steps */
+    .next-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .next-step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      background: #f8faff;
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid #e0e7ff;
+    }
+    .next-step .dot {
+      width: 10px;
+      height: 10px;
+      background: #2563eb;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .next-step h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 4px;
+    }
+    .next-step p {
+      font-size: 12px !important;
+      color: #6b7280 !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* Footer */
+    .footer {
+      background: #1e3a5f;
+      color: #93c5fd;
+      padding: 28px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .footer strong { color: white; }
+
+    /* Print */
+    @media print {
+      body { background: white; padding: 0; }
+      .page { box-shadow: none; border-radius: 0; }
+      .no-print { display: none; }
+    }
+
+    /* Print button */
+    .print-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(37,99,235,0.4);
+      z-index: 100;
+    }
+    .print-btn:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">⬇ Save as PDF</button>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">Roof<span>Auto</span></div>
+      <div class="badge">Confidential Report</div>
+    </div>
+    <h1>AI-Powered Roofing<br>Automation Platform</h1>
+    <p>A custom web application built for Reliable Exteriors Group to automate document processing, materials calculation, and crew order generation using Artificial Intelligence.</p>
+    <div class="meta">
+      <span>📅 March 2026</span>
+      <span>🏢 Reliable Exteriors Group</span>
+      <span>🚀 Deployed on Vercel</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- 1. Overview -->
+    <div class="section">
+      <div class="section-title"><span class="num">1</span> What Is Roof Auto?</div>
+      <p>
+        Roof Auto is a private web application built exclusively for Reliable Exteriors Group. It uses Artificial Intelligence to read your roofing job documents — Eagle View reports, insurance scopes, contracts, and permits — and automatically generates a complete materials order and crew summary.
+      </p>
+      <p>
+        What used to take significant manual effort per job now takes <strong>seconds</strong>.
+      </p>
+    </div>
+
+    <!-- 2. Problem -->
+    <div class="section">
+      <div class="section-title"><span class="num">2</span> The Problem It Solves</div>
+      <div class="cards">
+        <div class="card problem">
+          <h4>❌ Before Roof Auto</h4>
+          <ul>
+            <li>Manually reading multiple PDFs per job</li>
+            <li>Hand-calculating material quantities</li>
+            <li>Writing crew summaries from scratch</li>
+            <li>Risk of human error in calculations</li>
+            <li>Time wasted on repetitive paperwork</li>
+          </ul>
+        </div>
+        <div class="card solution">
+          <h4>✅ After Roof Auto</h4>
+          <ul>
+            <li>Upload PDFs — AI reads them instantly</li>
+            <li>Materials calculated automatically</li>
+            <li>Crew order generated in seconds</li>
+            <li>Consistent, formula-driven accuracy</li>
+            <li>Team focuses on the actual job</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. How It Works -->
+    <div class="section">
+      <div class="section-title"><span class="num">3</span> How It Works — Step by Step</div>
+      <table>
+        <thead>
+          <tr><th>Step</th><th>Action</th><th>What Happens</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>1</strong></td><td>Create a Job</td><td>Enter customer name, address, and any notes</td></tr>
+          <tr><td><strong>2</strong></td><td>Upload Documents</td><td>Upload up to 5 PDFs — each in its own labelled slot</td></tr>
+          <tr><td><strong>3</strong></td><td>Process with AI</td><td>Click one button — Claude AI reads all documents simultaneously</td></tr>
+          <tr><td><strong>4</strong></td><td>Review Results</td><td>Materials order and crew summary are generated instantly</td></tr>
+          <tr><td><strong>5</strong></td><td>Auto Cleanup</td><td>Job data is automatically deleted after 10 minutes</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 4. Document Types -->
+    <div class="section">
+      <div class="section-title"><span class="num">4</span> Supported Document Types</div>
+      <table>
+        <thead>
+          <tr><th>Document</th><th>Required?</th><th>What the AI Extracts</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Eagle View Report</strong></td>
+            <td>Yes</td>
+            <td>Squares, pitch, ridges, hips, valleys, rakes, eaves, pipe boots, vents</td>
+          </tr>
+          <tr>
+            <td><strong>Insurance / Scope</strong></td>
+            <td>Optional</td>
+            <td>Insurance company, claim number, approved amount, deductible, line items</td>
+          </tr>
+          <tr>
+            <td><strong>Signed Contract</strong></td>
+            <td>Optional</td>
+            <td>Customer details, agreed scope, special requirements</td>
+          </tr>
+          <tr>
+            <td><strong>City Code / Permit</strong></td>
+            <td>Optional</td>
+            <td>Local building code requirements, permit conditions</td>
+          </tr>
+          <tr>
+            <td><strong>Job Site Photos</strong></td>
+            <td>Optional</td>
+            <td>Visual damage notes, roof condition observations (multiple files allowed)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="highlight">
+        <p>📌 <strong>Smart Priority:</strong> When the same measurement appears in multiple documents, Eagle View data always takes priority — as it is the most precise and reliable source.</p>
+      </div>
+    </div>
+
+    <!-- 5. Materials -->
+    <div class="section">
+      <div class="section-title"><span class="num">5</span> Materials Automatically Calculated</div>
+      <div class="features">
+        <div class="feature"><div class="icon">🏠</div><h4>Shingles</h4><p>Calculated in squares from roof area</p></div>
+        <div class="feature"><div class="icon">📜</div><h4>Felt Underlayment</h4><p>Rolls based on total squares</p></div>
+        <div class="feature"><div class="icon">🧊</div><h4>Ice &amp; Water Shield</h4><p>Rolls for valleys and eaves</p></div>
+        <div class="feature"><div class="icon">🔺</div><h4>Ridge Cap Shingles</h4><p>Bundles from ridge + hip length</p></div>
+        <div class="feature"><div class="icon">📏</div><h4>Drip Edge</h4><p>Pieces for rakes and eaves</p></div>
+        <div class="feature"><div class="icon">🔧</div><h4>Pipe Boots</h4><p>Each, from extracted count</p></div>
+        <div class="feature"><div class="icon">💨</div><h4>Roof Vents</h4><p>Each, from extracted count</p></div>
+        <div class="feature"><div class="icon">📦</div><h4>Coil Nails</h4><p>Boxes by square count</p></div>
+        <div class="feature"><div class="icon">📦</div><h4>Cap Nails &amp; Starter</h4><p>Boxes and bundles from measurements</p></div>
+      </div>
+    </div>
+
+    <!-- 6. Formula Engine -->
+    <div class="section">
+      <div class="section-title"><span class="num">6</span> Formula Engine — Full Business Control</div>
+      <p>
+        All material calculations are driven by a <strong>Formula Engine</strong> — a dedicated page where every formula can be viewed, edited, or toggled on/off without touching any code.
+      </p>
+      <p>
+        If your ordering standards change — for example, if you start using a different nail quantity per square — you update the formula once and it applies to every future job automatically.
+      </p>
+      <div class="highlight">
+        <p>💡 This gives Reliable Exteriors Group full ownership over how materials are calculated, with no dependency on a developer for routine formula adjustments.</p>
+      </div>
+    </div>
+
+    <!-- 7. Technology -->
+    <div class="section">
+      <div class="section-title"><span class="num">7</span> Technology Used</div>
+      <div class="tech-grid">
+        <div class="tech-item">
+          <div class="layer">Frontend &amp; Backend</div>
+          <div class="name">Next.js (TypeScript)</div>
+          <div class="why">One unified codebase, fast performance, deployable to Vercel</div>
+        </div>
+        <div class="tech-item">
+          <div class="layer">Database</div>
+          <div class="name">MongoDB Atlas</div>
+          <div class="why">Cloud database — always available, no server to maintain</div>
+        </div>
+        <div class="tech-item">
+          <div class="layer">File Storage</div>
+          <div class="name">Vercel Blob</div>
+          <div class="why">Handles large PDF files securely in the cloud</div>
+        </div>
+        <div class="tech-item">
+          <div class="layer">Artificial Intelligence</div>
+          <div class="name">Anthropic Claude claude-opus-4-6</div>
+          <div class="why">State-of-the-art AI for reading and understanding documents</div>
+        </div>
+        <div class="tech-item">
+          <div class="layer">Styling</div>
+          <div class="name">Tailwind CSS</div>
+          <div class="why">Clean, professional, responsive user interface</div>
+        </div>
+        <div class="tech-item">
+          <div class="layer">Hosting</div>
+          <div class="name">Vercel</div>
+          <div class="why">Global deployment, auto-scales, secured with HTTPS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Security -->
+    <div class="section">
+      <div class="section-title"><span class="num">8</span> Security &amp; Data Privacy</div>
+      <ul class="security-list">
+        <li>🔒 All PDF files are stored in <strong>Vercel Blob</strong> — secure cloud storage, not on any local machine</li>
+        <li>⏱ Jobs and all associated data are <strong>automatically deleted after 10 minutes</strong> to protect customer privacy</li>
+        <li>🔑 All API keys and database credentials are stored securely in Vercel's environment — never visible in the code</li>
+        <li>🌐 The app is served over <strong>HTTPS</strong> — all data in transit is encrypted</li>
+        <li>🏢 The application is private — accessible only to Reliable Exteriors Group via the deployed URL</li>
+      </ul>
+    </div>
+
+    <!-- 9. Next Steps -->
+    <div class="section">
+      <div class="section-title"><span class="num">9</span> Recommended Next Steps</div>
+      <div class="next-steps">
+        <div class="next-step">
+          <div class="dot"></div>
+          <div>
+            <h4>User Login / Authentication</h4>
+            <p>Restrict app access to authorised team members only with secure login</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="dot"></div>
+          <div>
+            <h4>PDF Export for Materials Order</h4>
+            <p>Generate a printable/sendable PDF to submit directly to ABC Supply</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="dot"></div>
+          <div>
+            <h4>Email Notifications</h4>
+            <p>Automatically email the materials order when a job is processed</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="dot"></div>
+          <div>
+            <h4>ABC Supply Price Integration</h4>
+            <p>Pull live pricing to auto-calculate total job material cost</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="dot"></div>
+          <div>
+            <h4>Permanent Job Storage</h4>
+            <p>Extend job retention beyond 10 minutes for record-keeping</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="dot"></div>
+          <div>
+            <h4>Mobile App</h4>
+            <p>Native iOS/Android app for field use on job sites</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>
+      <strong>Roof Auto</strong> — Built for Reliable Exteriors Group
+    </div>
+    <div>
+      Powered by <strong>Anthropic Claude AI</strong> · Hosted on <strong>Vercel</strong> · March 2026
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+</body>
+</html>
