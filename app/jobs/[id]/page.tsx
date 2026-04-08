@@ -25,6 +25,7 @@ export default function JobDetailPage() {
   const [processing, setProcessing] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [uploadingType, setUploadingType] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
   const [processResult, setProcessResult] = useState<Record<string, unknown> | null>(null)
   const [processError, setProcessError] = useState('')
 
@@ -40,13 +41,20 @@ export default function JobDetailPage() {
     const files = e.target.files
     if (!files || files.length === 0) return
     setUploadingType(docType)
+    setUploadProgress((p) => ({ ...p, [docType]: 0 }))
+
     for (const file of Array.from(files)) {
-      // Upload directly from browser to Vercel Blob — no server size limit
-      const blob = await upload(`jobs/${id}/${docType}_${Date.now()}_${file.name}`, file, {
-        access: 'public',
-        handleUploadUrl: '/api/blob-upload',
-      })
-      // Save the blob URL + metadata to MongoDB
+      const blob = await upload(
+        `jobs/${id}/${docType}_${Date.now()}_${file.name}`,
+        file,
+        {
+          access: 'public',
+          handleUploadUrl: '/api/blob-upload',
+          onUploadProgress: ({ percentage }) => {
+            setUploadProgress((p) => ({ ...p, [docType]: Math.round(percentage) }))
+          },
+        }
+      )
       await fetch(`/api/jobs/${id}/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,6 +68,7 @@ export default function JobDetailPage() {
     }
     await load()
     setUploadingType(null)
+    setUploadProgress((p) => ({ ...p, [docType]: 100 }))
     e.target.value = ''
   }
 
@@ -205,7 +214,7 @@ export default function JobDetailPage() {
                       hasFiles ? 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50' :
                       'bg-brand text-white border-brand hover:bg-brand-dark'}`}>
                     <Upload size={12} />
-                    {isUploading ? 'Uploading...' : hasFiles ? 'Replace' : 'Upload PDF'}
+                    {isUploading ? `Uploading ${uploadProgress[slot.type] ?? 0}%` : hasFiles ? 'Replace' : 'Upload PDF'}
                     <input
                       type="file"
                       className="hidden"
@@ -216,6 +225,22 @@ export default function JobDetailPage() {
                     />
                   </label>
                 </div>
+
+                {/* Progress bar — visible while uploading */}
+                {isUploading && (
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-blue-600 mb-1">
+                      <span>Uploading to cloud...</span>
+                      <span>{uploadProgress[slot.type] ?? 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress[slot.type] ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
