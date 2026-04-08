@@ -24,19 +24,27 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   await Job.findByIdAndUpdate(params.id, { status: 'processing' })
 
+  // Process all documents in parallel — much faster than sequential
+  const results = await Promise.allSettled(
+    docs.map(async (doc) => {
+      console.log(`[process] starting: ${doc.fileName} (${doc.docType})`)
+      const extracted = await extractDocument(doc.blobUrl, doc.fileName, doc.docType)
+      console.log(`[process] done: ${doc.fileName}`)
+      await JobDocument.findByIdAndUpdate(doc._id, { extractedData: extracted, processed: true })
+      return { docType: doc.docType, extractedData: extracted }
+    })
+  )
+
   const errors: unknown[] = []
   const processedDocs: Array<{ docType: string; extractedData: Record<string, unknown> }> = []
 
-  for (const doc of docs) {
-    try {
-      console.log(`[process] extracting: ${doc.fileName} (${doc.docType})`)
-      const extracted = await extractDocument(doc.blobUrl, doc.fileName, doc.docType)
-      console.log(`[process] done: ${doc.fileName}`, JSON.stringify(extracted).slice(0, 200))
-      await JobDocument.findByIdAndUpdate(doc._id, { extractedData: extracted, processed: true })
-      processedDocs.push({ docType: doc.docType, extractedData: extracted })
-    } catch (e) {
-      console.error(`[process] FAILED: ${doc.fileName}`, String(e))
-      errors.push({ file: doc.fileName, error: String(e) })
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i]
+    if (r.status === 'fulfilled') {
+      processedDocs.push(r.value)
+    } else {
+      console.error(`[process] FAILED: ${docs[i].fileName}`, r.reason)
+      errors.push({ file: docs[i].fileName, error: String(r.reason) })
     }
   }
 
