@@ -83,10 +83,14 @@ export default function JobDetailPage() {
     try {
       const res = await fetch(`/api/jobs/${id}/process`, { method: 'POST' })
       const data = await res.json()
-      if (res.ok) {
-        setProcessResult(data)
-      } else {
+      if (!res.ok) {
         setProcessError(data.error || 'Processing failed')
+      } else if (data.documentsProcessed === 0) {
+        // All docs failed — show the actual errors
+        const errs = data.errors?.map((e: {file: string; error: string}) => `${e.file}: ${e.error}`).join('\n') || 'Unknown error'
+        setProcessError(`No documents were processed.\n${errs}`)
+      } else {
+        setProcessResult(data)
       }
       await load()
     } finally {
@@ -156,7 +160,12 @@ export default function JobDetailPage() {
           </div>
         )}
         {processError && (
-          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{processError}</div>
+          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <p className="font-semibold mb-1">Processing failed</p>
+            {processError.split('\n').map((line, i) => (
+              <p key={i} className="text-xs text-red-500">{line}</p>
+            ))}
+          </div>
         )}
         {processResult && (
           <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
