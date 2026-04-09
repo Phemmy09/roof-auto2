@@ -9,13 +9,22 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  await connectDB()
-  const body = await req.json()
-  const job = await Job.create({
-    name: body.name,
-    customerName: body.customerName ?? '',
-    address: body.address ?? '',
-    notes: body.notes ?? '',
-  })
-  return NextResponse.json(job, { status: 201 })
+  try {
+    await connectDB()
+    const body = await req.json()
+    if (!body.name) {
+      return NextResponse.json({ error: 'Job name is required' }, { status: 400 })
+    }
+    const job = await Job.create({
+      name: body.name,
+      customerName: body.customerName ?? '',
+      address: body.address ?? '',
+      notes: body.notes ?? '',
+    })
+    return NextResponse.json(job, { status: 201 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[POST /api/jobs] error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }

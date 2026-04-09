@@ -20,11 +20,12 @@ export default function NewJobPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
-      if (!res.ok) throw new Error('Failed')
       const job = await res.json()
+      if (!res.ok) throw new Error(job.error || `HTTP ${res.status}`)
       router.push(`/jobs/${job._id}`)
-    } catch {
-      setError('Failed to create job. Please try again.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(`Failed to create job: ${msg}`)
     } finally {
       setLoading(false)
     }
