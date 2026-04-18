@@ -2,7 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const PROMPT = (docType: string, fileName: string) =>
+// Structured extraction prompt for document PDFs (eagle_view, insurance, contract, etc.)
+const DOC_PROMPT = (docType: string, fileName: string) =>
   `You are a roofing estimator AI. Extract all relevant data from this ${docType} document text.
 Return a JSON object with these fields (use null if not found):
 {
@@ -25,6 +26,36 @@ Return a JSON object with these fields (use null if not found):
   "special_notes": string
 }
 Return ONLY valid JSON, no explanation. File: ${fileName}`
+
+// Vision analysis prompt for roof images and photo documents
+const IMAGE_ANALYSIS_SYSTEM_PROMPT = `You are an expert roofing analyst. Analyze the provided roof images and documents.
+Extract all measurements, identify damage types and severity, read all handwritten
+annotations, note materials used, and provide a structured assessment report.
+Return a JSON object with these fields (use null if not found):
+{
+  "squares": number,
+  "pitch": number,
+  "ridges": number,
+  "hips": number,
+  "valleys": number,
+  "rakes": number,
+  "eaves": number,
+  "pipe_boots": number,
+  "vents": number,
+  "customer_name": string,
+  "address": string,
+  "damage_types": array,
+  "damage_severity": string,
+  "materials_noted": array,
+  "handwritten_notes": string,
+  "special_notes": string,
+  "insurance_company": string,
+  "claim_number": string,
+  "approved_amount": number,
+  "deductible": number,
+  "line_items": array
+}
+Return ONLY valid JSON, no explanation.`
 
 function parseJson(raw: string): Record<string, unknown> {
   try {
@@ -73,7 +104,7 @@ async function extractFromText(
     max_tokens: 2048,
     messages: [{
       role: 'user',
-      content: `${PROMPT(docType, fileName)}\n\nDocument text:\n${text}`,
+      content: `${DOC_PROMPT(docType, fileName)}\n\nDocument text:\n${text}`,
     }],
   })
   return parseJson(res.content[0].type === 'text' ? res.content[0].text : '{}')
@@ -94,13 +125,14 @@ async function extractFromBase64(
       content: [
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
-        { type: 'text', text: PROMPT(docType, fileName) },
+        { type: 'text', text: DOC_PROMPT(docType, fileName) },
       ],
     }],
   })
   return parseJson(res.content[0].type === 'text' ? res.content[0].text : '{}')
 }
 
+// Extract data from a PDF document (text → base64 → chunked fallback)
 export async function extractDocument(
   blobUrl: string,
   fileName: string,
@@ -132,7 +164,7 @@ export async function extractDocument(
     return await extractFromBase64(buffer, fileName, docType)
   }
 
-  // Step 3: large image PDF — split into chunks
+  // Step 3: large image PDF — split into 8-page chunks
   console.log(`[extract] ${fileName}: too large for vision, splitting into chunks`)
   const { PDFDocument } = await import('pdf-lib')
   const srcDoc = await PDFDocument.load(buffer)
@@ -151,6 +183,55 @@ export async function extractDocument(
     const keys = ['squares', 'pitch', 'ridges', 'hips', 'valleys', 'rakes', 'eaves']
     if (keys.every(k => combined[k] !== null && combined[k] !== undefined)) break
   }
+  return combined
+}
+
+// Analyze image files using Claude vision — batches max 5 images per API call
+// Used for photos doc type (JPEG, PNG, WebP, GIF uploads)
+export async function analyzeImages(imageUrls: string[]): Promise<Record<string, unknown>> {
+  const BATCH_SIZE = 5
+  let combined: Record<string, unknown> = {}
+
+  for (let i = 0; i < imageUrls.length; i += BATCH_SIZE) {
+    const batch = imageUrls.slice(i, i + BATCH_SIZE)
+    console.log(`[analyzeImages] batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} images`)
+
+    const imageContents = await Promise.all(
+      batch.map(async (url) => {
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`Failed to fetch image (${res.status}): ${url}`)
+        const buffer = Buffer.from(await res.arrayBuffer())
+        const contentType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0]
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+        const mediaType = validTypes.includes(contentType) ? contentType : 'image/jpeg'
+        return {
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
+            data: buffer.toString('base64'),
+          },
+        }
+      })
+    )
+
+    const res = await anthropic.messages.create({
+      model: 'claude-opus-4-6',
+      max_tokens: 2048,
+      system: IMAGE_ANALYSIS_SYSTEM_PROMPT,
+      messages: [{
+        role: 'user',
+        content: [
+          ...imageContents,
+          { type: 'text', text: 'Analyze these roof images and extract all data.' },
+        ],
+      }],
+    })
+
+    const result = parseJson(res.content[0].type === 'text' ? res.content[0].text : '{}')
+    combined = mergeTwo(combined, result)
+  }
+
   return combined
 }
 

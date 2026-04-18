@@ -13,6 +13,7 @@
     "@react-pdf/renderer": "^3.4.0",
     "@vercel/blob": "^2.3.2",
     "axios": "^1.7.0",
+    "browser-image-compression": "^2.0.2",
     "lucide-react": "^0.400.0",
     "mathjs": "^13.0.0",
     "mongoose": "^8.4.0",

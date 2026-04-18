@@ -6,6 +6,7 @@ export interface IJobDoc extends Document {
   address: string
   notes: string
   status: 'pending' | 'processing' | 'review' | 'complete'
+  processingStage: 'idle' | 'downloading' | 'extracting' | 'analyzing' | 'calculating' | 'done' | 'failed'
   extractedData: Record<string, unknown>
   createdAt: Date
   updatedAt: Date
@@ -18,6 +19,11 @@ const JobSchema = new Schema<IJobDoc>(
     address: { type: String, default: '' },
     notes: { type: String, default: '' },
     status: { type: String, enum: ['pending', 'processing', 'review', 'complete'], default: 'pending' },
+    processingStage: {
+      type: String,
+      enum: ['idle', 'downloading', 'extracting', 'analyzing', 'calculating', 'done', 'failed'],
+      default: 'idle',
+    },
     extractedData: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
