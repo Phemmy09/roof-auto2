@@ -62,7 +62,7 @@ def run():
         formulas = r.json()
         print(f"        Found {len(formulas)} formulas")
         if formulas:
-            formula_id = str(formulas[0]["_id"])
+            formula_id = str(formulas[0]["id"])
 
     r = requests.post(f"{BASE}/api/formulas/preview", json={
         "formula_expr": "ceil(squares * 1.15 / 3)",
@@ -85,8 +85,8 @@ def run():
         "sortOrder": 99
     })
     if check("POST /api/formulas (create)", r, 201):
-        new_fid = str(r.json()["_id"])
-        r2 = requests.put(f"{BASE}/api/formulas/{new_fid}", json={"notes": "updated"})
+        new_fid = str(r.json()["id"])
+        r2 = requests.put(f"{BASE}/api/formulas/{new_fid}", json={"category": "test-updated"})
         check("PUT /api/formulas/[id] (update)", r2)
         r3 = requests.delete(f"{BASE}/api/formulas/{new_fid}")
         check("DELETE /api/formulas/[id]", r3, 204)
@@ -104,7 +104,7 @@ def run():
         "notes": "Automated test job"
     })
     if check("POST /api/jobs (create)", r, 201):
-        job_id = str(r.json()["_id"])
+        job_id = str(r.json()["id"])
         print(f"        job_id = {job_id}")
 
     if job_id:
@@ -123,13 +123,14 @@ def run():
     section("4. Document Upload")
 
     if job_id:
-        # Create a minimal PDF-like file for testing
-        fake_pdf = b"%PDF-1.4 1 0 obj<</Type/Catalog>>endobj\nThis is a test PDF for Roof Auto."
-        files = {"file": ("test_eagle_view.pdf", fake_pdf, "application/pdf")}
-        data = {"doc_type": "eagle_view"}
-        r = requests.post(f"{BASE}/api/jobs/{job_id}/documents", files=files, data=data)
+        r = requests.post(f"{BASE}/api/jobs/{job_id}/documents", json={
+            "fileUrl": "https://oaohufpuxlpmmacrxcdq.supabase.co/storage/v1/object/public/roof-documents/jobs/test/test_eagle_view.pdf",
+            "fileName": "test_eagle_view.pdf",
+            "mimeType": "application/pdf",
+            "docType": "eagle_view"
+        })
         if check("POST /api/jobs/[id]/documents (upload)", r, 201):
-            doc_id = str(r.json()["_id"])
+            doc_id = str(r.json()["id"])
             print(f"        doc_id = {doc_id}")
 
         if doc_id:

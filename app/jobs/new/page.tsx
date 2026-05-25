@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 export default function NewJobPage() {
   const router = useRouter()
-  const [form, setForm] = useState({ name: '', customerName: '', address: '', notes: '' })
+  const [form, setForm] = useState({ name: '', customerName: '', address: '', notes: '', email: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +22,7 @@ export default function NewJobPage() {
       })
       const job = await res.json()
       if (!res.ok) throw new Error(job.error || `HTTP ${res.status}`)
-      router.push(`/jobs/${job._id}`)
+      router.push(`/jobs/${job.id}`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       setError(`Failed to create job: ${msg}`)
@@ -44,6 +44,10 @@ export default function NewJobPage() {
         <div>
           <label className="block text-sm font-medium mb-1">Customer Name</label>
           <input className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" placeholder="e.g. Becky Bramlage" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Customer Email</label>
+          <input type="email" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand" placeholder="e.g. customer@email.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Property Address</label>

@@ -21,15 +21,15 @@ export default function JobsPage() {
   const filtered = jobs.filter(
     (j) =>
       j.name.toLowerCase().includes(search.toLowerCase()) ||
-      j.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+      j.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
       j.address?.toLowerCase().includes(search.toLowerCase())
   )
 
   const counts = {
     pending: jobs.filter((j) => j.status === 'pending').length,
-    processing: jobs.filter((j) => j.status === 'processing').length,
-    review: jobs.filter((j) => j.status === 'review').length,
+    processing: jobs.filter((j) => j.status === 'processing' || j.status === 'analyzing').length,
     complete: jobs.filter((j) => j.status === 'complete').length,
+    failed: jobs.filter((j) => j.status === 'failed').length,
   }
 
   return (
@@ -79,14 +79,14 @@ export default function JobsPage() {
         <div className="space-y-3">
           {filtered.map((job) => (
             <Link
-              key={job._id}
-              href={`/jobs/${job._id}`}
+              key={job.id}
+              href={`/jobs/${job.id}`}
               className="block bg-white border rounded-xl p-4 hover:shadow-md transition"
             >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-gray-900">{job.name}</p>
-                  <p className="text-sm text-gray-500">{job.customerName} · {job.address}</p>
+                  <p className="text-sm text-gray-500">{job.customer_name} · {job.address}</p>
                 </div>
                 <StatusBadge status={job.status} />
               </div>

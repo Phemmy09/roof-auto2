@@ -1,16 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDB } from '@/lib/mongodb'
-import Formula from '@/models/Formula'
+import { supabase } from '@/lib/supabase'
 
 export async function GET() {
-  await connectDB()
-  const formulas = await Formula.find().sort({ sortOrder: 1 }).lean()
-  return NextResponse.json(formulas)
+  const { data, error } = await supabase
+    .from('formulas')
+    .select('*')
+    .order('sort_order', { ascending: true })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {
-  await connectDB()
   const body = await req.json()
-  const formula = await Formula.create(body)
-  return NextResponse.json(formula, { status: 201 })
+  const { data, error } = await supabase
+    .from('formulas')
+    .insert({
+      name: body.name,
+      item_name: body.itemName ?? body.item_name,
+      formula_expr: body.formulaExpr ?? body.formula_expr,
+      unit: body.unit,
+      default_color: body.defaultColor ?? body.default_color ?? '',
+      default_size: body.defaultSize ?? body.default_size ?? '',
+      category: body.category ?? 'main',
+      active: body.active ?? true,
+      sort_order: body.sortOrder ?? body.sort_order ?? 0,
+    })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data, { status: 201 })
 }

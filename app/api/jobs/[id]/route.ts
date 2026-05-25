@@ -1,45 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { del } from '@vercel/blob'
-import { connectDB } from '@/lib/mongodb'
-import Job from '@/models/Job'
-import JobDocument from '@/models/Document'
-import MaterialsOrder from '@/models/MaterialsOrder'
-import CrewOrder from '@/models/CrewOrder'
+import { supabase, STORAGE_BUCKET } from '@/lib/supabase'
 
 type Params = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  await connectDB()
-  const job = await Job.findById(params.id).lean()
-  if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const { data: job, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', params.id)
+    .single()
 
-  const [docs, materials, crew] = await Promise.all([
-    JobDocument.find({ jobId: params.id }).select('-fileData').lean(),
-    MaterialsOrder.findOne({ jobId: params.id }).lean(),
-    CrewOrder.findOne({ jobId: params.id }).lean(),
+  if (error || !job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const [docsResult, materialsResult, crewResult] = await Promise.all([
+    supabase.from('documents').select('*').eq('job_id', params.id),
+    supabase.from('materials_orders').select('*').eq('job_id', params.id).single(),
+    supabase.from('crew_orders').select('*').eq('job_id', params.id).single(),
   ])
 
-  return NextResponse.json({ ...job, documents: docs, materialsOrder: materials, crewOrder: crew })
+  return NextResponse.json({
+    ...job,
+    documents: docsResult.data || [],
+    materialsOrder: materialsResult.data || null,
+    crewOrder: crewResult.data || null,
+  })
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  await connectDB()
   const body = await req.json()
-  const job = await Job.findByIdAndUpdate(params.id, body, { new: true }).lean()
-  if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(job)
+
+  // Map camelCase from frontend to snake_case for Supabase
+  const update: Record<string, unknown> = {}
+  if (body.name !== undefined) update.name = body.name
+  if (body.customerName !== undefined) update.customer_name = body.customerName
+  if (body.address !== undefined) update.address = body.address
+  if (body.notes !== undefined) update.notes = body.notes
+  if (body.status !== undefined) update.status = body.status
+  if (body.processingStage !== undefined) update.processing_stage = body.processingStage
+  if (body.extractedData !== undefined) update.extracted_data = body.extractedData
+  if (body.email !== undefined) update.email = body.email
+  // Also allow snake_case directly
+  Object.entries(body).forEach(([k, v]) => {
+    if (k.includes('_')) update[k] = v
+  })
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .update(update)
+    .eq('id', params.id)
+    .select()
+    .single()
+
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(data)
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  await connectDB()
-  // Delete all blobs for this job's documents
-  const docs = await JobDocument.find({ jobId: params.id }).select('blobUrl')
-  await Promise.all(
-    docs.filter(d => d.blobUrl).map(d => del(d.blobUrl).catch(() => {}))
-  )
-  await JobDocument.deleteMany({ jobId: params.id })
-  await MaterialsOrder.deleteOne({ jobId: params.id })
-  await CrewOrder.deleteOne({ jobId: params.id })
-  await Job.findByIdAndDelete(params.id)
+  // Get document file paths to delete from storage
+  const { data: docs } = await supabase
+    .from('documents')
+    .select('file_url')
+    .eq('job_id', params.id)
+
+  if (docs && docs.length > 0) {
+    // Extract storage paths from public URLs
+    const paths = docs
+      .map(d => {
+        try {
+          const url = new URL(d.file_url)
+          const bucketPrefix = `/storage/v1/object/public/${STORAGE_BUCKET}/`
+          const idx = url.pathname.indexOf(bucketPrefix)
+          if (idx >= 0) return decodeURIComponent(url.pathname.slice(idx + bucketPrefix.length))
+          return null
+        } catch {
+          return null
+        }
+      })
+      .filter((p): p is string => p !== null)
+
+    if (paths.length > 0) {
+      await supabase.storage.from(STORAGE_BUCKET).remove(paths)
+    }
+  }
+
+  // Cascade delete handles documents, materials_orders, crew_orders
+  await supabase.from('jobs').delete().eq('id', params.id)
   return new NextResponse(null, { status: 204 })
 }

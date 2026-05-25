@@ -1,30 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDB } from '@/lib/mongodb'
-import JobDocument from '@/models/Document'
+import { supabase } from '@/lib/supabase'
 
 type Params = { params: { id: string } }
 
-// The browser uploads the file directly to Vercel Blob and sends us
-// just the resulting blobUrl + metadata — no file bytes pass through here.
+// The browser uploads the file directly to Supabase Storage and sends us
+// just the resulting publicUrl + metadata — no file bytes pass through here.
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    await connectDB()
     const body = await req.json()
-    const { blobUrl, fileName, mimeType, docType } = body
+    const { fileUrl, fileName, mimeType, docType } = body
 
-    if (!blobUrl || !fileName || !docType) {
-      return NextResponse.json({ error: 'Missing blobUrl, fileName or docType' }, { status: 400 })
+    if (!fileUrl || !fileName || !docType) {
+      return NextResponse.json({ error: 'Missing fileUrl, fileName or docType' }, { status: 400 })
     }
 
-    const doc = await JobDocument.create({
-      jobId: params.id,
-      fileName,
-      docType,
-      mimeType: mimeType || 'application/pdf',
-      blobUrl,
-    })
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({
+        job_id: params.id,
+        file_name: fileName,
+        doc_type: docType,
+        mime_type: mimeType || 'application/pdf',
+        file_type: mimeType || 'application/pdf',
+        file_url: fileUrl,
+      })
+      .select()
+      .single()
 
-    return NextResponse.json(doc.toObject(), { status: 201 })
+    if (error) throw new Error(error.message)
+    return NextResponse.json(data, { status: 201 })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[documents POST]', message)

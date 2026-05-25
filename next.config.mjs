@@ -1,7 +1,7 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ["mongoose", "pdfjs-dist", "pdf-lib", "canvas"],
+    serverComponentsExternalPackages: ["pdfjs-dist", "pdf-lib", "canvas", "sharp"],
     serverActions: {
       bodySizeLimit: '20mb',
     },

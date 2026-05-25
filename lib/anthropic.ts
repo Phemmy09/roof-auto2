@@ -30,30 +30,36 @@ Return ONLY valid JSON, no explanation. File: ${fileName}`
 // Vision analysis prompt for roof images and photo documents
 const IMAGE_ANALYSIS_SYSTEM_PROMPT = `You are an expert roofing analyst. Analyze the provided roof images and documents.
 Extract all measurements, identify damage types and severity, read all handwritten
-annotations, note materials used, and provide a structured assessment report.
+annotations, note materials used, and produce a structured JSON assessment with sections:
+summary, damage_assessment, measurements, materials, recommendations, urgency_level.
+
 Return a JSON object with these fields (use null if not found):
 {
-  "squares": number,
-  "pitch": number,
-  "ridges": number,
-  "hips": number,
-  "valleys": number,
-  "rakes": number,
-  "eaves": number,
-  "pipe_boots": number,
-  "vents": number,
+  "summary": string,
+  "damage_assessment": { "types": array, "severity": string, "details": string },
+  "measurements": {
+    "squares": number,
+    "pitch": number,
+    "ridges": number,
+    "hips": number,
+    "valleys": number,
+    "rakes": number,
+    "eaves": number,
+    "pipe_boots": number,
+    "vents": number
+  },
+  "materials": array,
+  "recommendations": array,
+  "urgency_level": string,
   "customer_name": string,
   "address": string,
-  "damage_types": array,
-  "damage_severity": string,
-  "materials_noted": array,
   "handwritten_notes": string,
-  "special_notes": string,
   "insurance_company": string,
   "claim_number": string,
   "approved_amount": number,
   "deductible": number,
-  "line_items": array
+  "line_items": array,
+  "special_notes": string
 }
 Return ONLY valid JSON, no explanation.`
 
@@ -100,7 +106,7 @@ async function extractFromText(
   docType: string
 ): Promise<Record<string, unknown>> {
   const res = await anthropic.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-sonnet-4-20250514',
     max_tokens: 2048,
     messages: [{
       role: 'user',
@@ -118,7 +124,7 @@ async function extractFromBase64(
 ): Promise<Record<string, unknown>> {
   const base64 = buffer.toString('base64')
   const res = await anthropic.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-sonnet-4-20250514',
     max_tokens: 2048,
     messages: [{
       role: 'user',
@@ -134,13 +140,13 @@ async function extractFromBase64(
 
 // Extract data from a PDF document (text → base64 → chunked fallback)
 export async function extractDocument(
-  blobUrl: string,
+  fileUrl: string,
   fileName: string,
   docType: string
 ): Promise<Record<string, unknown>> {
   console.log(`[extract] downloading: ${fileName}`)
-  const res = await fetch(blobUrl)
-  if (!res.ok) throw new Error(`Failed to fetch blob (${res.status}): ${blobUrl}`)
+  const res = await fetch(fileUrl)
+  if (!res.ok) throw new Error(`Failed to fetch file (${res.status}): ${fileUrl}`)
 
   const buffer = Buffer.from(await res.arrayBuffer())
   const sizeMb = (buffer.byteLength / 1024 / 1024).toFixed(1)
@@ -216,7 +222,7 @@ export async function analyzeImages(imageUrls: string[]): Promise<Record<string,
     )
 
     const res = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
       system: IMAGE_ANALYSIS_SYSTEM_PROMPT,
       messages: [{

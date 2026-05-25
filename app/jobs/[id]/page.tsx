@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { upload } from '@vercel/blob/client'
 import { IJob, IDocument, IMaterialsOrder, ICrewOrder } from '@/types'
 import StatusBadge from '@/components/StatusBadge'
 import { Upload, Zap, Trash2, ArrowLeft, CheckCircle, FileText } from 'lucide-react'
@@ -61,7 +60,7 @@ export default function JobDetailPage() {
             setProcessingStage(data.processingStage || 'idle')
           }
         } catch { /* ignore poll errors */ }
-      }, 2000)
+      }, 3000)
     } else {
       if (pollRef.current) {
         clearInterval(pollRef.current)
@@ -80,7 +79,7 @@ export default function JobDetailPage() {
     setUploadProgress((p) => ({ ...p, [docType]: 0 }))
 
     for (const file of Array.from(files)) {
-      let fileToUpload = file
+      let fileToUpload: File | Blob = file
 
       // Compress images before upload (skip PDFs and non-image files)
       if (file.type.startsWith('image/')) {
@@ -105,28 +104,55 @@ export default function JobDetailPage() {
 
       setUploadingType(docType)
 
-      const blob = await upload(
-        `jobs/${id}/${docType}_${Date.now()}_${file.name}`,
-        fileToUpload,
-        {
-          access: 'public',
-          handleUploadUrl: '/api/blob-upload',
-          onUploadProgress: ({ percentage }) => {
-            const base = fileToUpload !== file ? 40 : 0
-            setUploadProgress((p) => ({ ...p, [docType]: base + Math.round(percentage * (100 - base) / 100) }))
-          },
-        }
-      )
-      await fetch(`/api/jobs/${id}/documents`, {
+      // Step 1: Get signed upload URL from our API
+      const urlRes = await fetch('/api/get-upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          blobUrl: blob.url,
           fileName: file.name,
-          mimeType: file.type || 'application/pdf',
+          jobId: id,
           docType,
         }),
       })
+      const urlData = await urlRes.json()
+      if (!urlRes.ok) {
+        console.error('[upload] Failed to get signed URL:', urlData.error)
+        setUploadingType(null)
+        continue
+      }
+
+      // Step 2: Upload directly to Supabase Storage using the signed URL
+      try {
+        const uploadRes = await fetch(urlData.signedUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+          },
+          body: fileToUpload,
+        })
+
+        if (!uploadRes.ok) {
+          console.error('[upload] Direct upload failed:', uploadRes.status)
+          setUploadingType(null)
+          continue
+        }
+
+        setUploadProgress((p) => ({ ...p, [docType]: 80 }))
+
+        // Step 3: Register the document metadata with our API
+        await fetch(`/api/jobs/${id}/documents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileUrl: urlData.publicUrl,
+            fileName: file.name,
+            mimeType: file.type || 'application/pdf',
+            docType,
+          }),
+        })
+      } catch (err) {
+        console.error('[upload] Upload error:', err)
+      }
     }
 
     await load()
@@ -175,7 +201,7 @@ export default function JobDetailPage() {
   if (loading) return <p className="text-gray-400 py-12 text-center">Loading...</p>
   if (!job) return <p className="text-gray-400 py-12 text-center">Job not found</p>
 
-  const docsByType = (type: string) => job.documents.filter((d) => d.docType === type)
+  const docsByType = (type: string) => job.documents.filter((d) => d.doc_type === type)
   const totalDocs = job.documents.length
   const stageLabel = STAGE_LABELS[processingStage] ?? 'Processing...'
 
@@ -189,7 +215,7 @@ export default function JobDetailPage() {
       <div className="bg-white border rounded-xl p-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">{job.name}</h1>
-          <p className="text-gray-500">{job.customerName} · {job.address}</p>
+          <p className="text-gray-500">{job.customer_name} · {job.address}</p>
           {job.notes && <p className="text-sm text-gray-400 mt-1">{job.notes}</p>}
         </div>
         <StatusBadge status={job.status} />
@@ -296,11 +322,11 @@ export default function JobDetailPage() {
                       {docs.length > 0 && (
                         <ul className="mt-2 space-y-1">
                           {docs.map((doc) => (
-                            <li key={doc._id} className="flex items-center gap-2 text-xs text-gray-600">
-                              <span className="truncate max-w-xs">{doc.fileName}</span>
+                            <li key={doc.id} className="flex items-center gap-2 text-xs text-gray-600">
+                              <span className="truncate max-w-xs">{doc.file_name}</span>
                               {doc.processed && <span className="text-green-600 font-medium shrink-0">Processed</span>}
                               <button
-                                onClick={() => handleDeleteDoc(doc._id)}
+                                onClick={() => handleDeleteDoc(doc.id)}
                                 className="text-red-400 hover:text-red-600 shrink-0"
                               >
                                 <Trash2 size={12} />
@@ -359,6 +385,51 @@ export default function JobDetailPage() {
           })}
         </div>
       </div>
+
+      {/* Report Section */}
+      {job.result && Object.keys(job.result).length > 0 && (() => {
+        const report = job.result as Record<string, unknown>
+        const urgency = typeof report.urgency_level === 'string' ? report.urgency_level : ''
+        const summary = typeof report.summary === 'string' ? report.summary : ''
+        const recommendations = Array.isArray(report.recommendations) ? report.recommendations as string[] : []
+        return (
+        <div className="bg-white border rounded-xl p-6">
+          <h2 className="font-semibold mb-4">Analysis Report</h2>
+          {urgency && (
+            <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 ${
+              urgency === 'critical' ? 'bg-red-100 text-red-700' :
+              urgency === 'high' ? 'bg-orange-100 text-orange-700' :
+              urgency === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-green-100 text-green-700'
+            }`}>
+              Urgency: {urgency.toUpperCase()}
+            </div>
+          )}
+          {summary && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Summary</p>
+              <p className="text-sm text-gray-700">{summary}</p>
+            </div>
+          )}
+          {recommendations.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Recommendations</p>
+              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                {recommendations.map((r, i) => (
+                  <li key={i}>{String(r)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <details className="mt-4">
+            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">View raw report JSON</summary>
+            <pre className="text-xs text-gray-600 bg-gray-50 rounded p-3 overflow-auto mt-2 max-h-64">
+              {JSON.stringify(report, null, 2)}
+            </pre>
+          </details>
+        </div>
+        )
+      })()}
 
       {/* Materials Order */}
       {job.materialsOrder && job.materialsOrder.items.length > 0 && (

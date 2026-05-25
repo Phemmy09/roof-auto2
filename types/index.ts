@@ -1,28 +1,34 @@
-export type JobStatus = 'pending' | 'processing' | 'review' | 'complete'
+export type JobStatus = 'pending' | 'uploading' | 'processing' | 'analyzing' | 'complete' | 'failed' | 'review'
 
 export type DocType = 'eagle_view' | 'contract' | 'insurance' | 'city_code' | 'photos'
 
 export interface IJob {
-  _id: string
+  id: string
   name: string
-  customerName: string
+  customer_name: string
+  email: string
   address: string
   notes: string
   status: JobStatus
-  extractedData: Record<string, unknown>
-  createdAt: string
-  updatedAt: string
+  processing_stage: string
+  extracted_data: Record<string, unknown>
+  result: Record<string, unknown>
+  error: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface IDocument {
-  _id: string
-  jobId: string
-  fileName: string
-  docType: DocType
-  mimeType: string
-  extractedData: Record<string, unknown>
+  id: string
+  job_id: string
+  file_name: string
+  doc_type: DocType
+  mime_type: string
+  file_url: string
+  file_type: string
+  extracted_data: Record<string, unknown>
   processed: boolean
-  createdAt: string
+  created_at: string
 }
 
 export interface IMaterialItem {
@@ -35,17 +41,17 @@ export interface IMaterialItem {
 }
 
 export interface IMaterialsOrder {
-  _id: string
-  jobId: string
+  id: string
+  job_id: string
   items: IMaterialItem[]
-  updatedAt: string
+  updated_at: string
 }
 
 export interface ICrewOrder {
-  _id: string
-  jobId: string
+  id: string
+  job_id: string
   data: Record<string, unknown>
-  updatedAt: string
+  updated_at: string
 }
 
 export interface IFormula {

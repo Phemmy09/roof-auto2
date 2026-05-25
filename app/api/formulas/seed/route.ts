@@ -1,11 +1,29 @@
 import { NextResponse } from 'next/server'
-import { connectDB } from '@/lib/mongodb'
-import Formula from '@/models/Formula'
+import { supabase } from '@/lib/supabase'
 import { DEFAULT_FORMULAS } from '@/lib/formula-engine'
 
 export async function POST() {
-  await connectDB()
-  await Formula.deleteMany({})
-  const formulas = await Formula.insertMany(DEFAULT_FORMULAS)
-  return NextResponse.json({ seeded: formulas.length })
+  // Delete all existing formulas
+  await supabase.from('formulas').delete().gte('sort_order', 0)
+
+  // Insert defaults (map camelCase to snake_case)
+  const rows = DEFAULT_FORMULAS.map(f => ({
+    name: f.name,
+    item_name: f.itemName,
+    formula_expr: f.formulaExpr,
+    unit: f.unit,
+    default_color: f.defaultColor,
+    default_size: f.defaultSize,
+    category: f.category,
+    active: f.active,
+    sort_order: f.sortOrder,
+  }))
+
+  const { data, error } = await supabase
+    .from('formulas')
+    .insert(rows)
+    .select()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ seeded: data.length })
 }

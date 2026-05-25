@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDB } from '@/lib/mongodb'
-import CrewOrder from '@/models/CrewOrder'
+import { supabase } from '@/lib/supabase'
 
 type Params = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  await connectDB()
-  const order = await CrewOrder.findOne({ jobId: params.id }).lean()
-  return NextResponse.json(order ?? { jobId: params.id, data: {} })
+  const { data, error } = await supabase
+    .from('crew_orders')
+    .select('*')
+    .eq('job_id', params.id)
+    .single()
+
+  if (error) return NextResponse.json({ job_id: params.id, data: {} })
+  return NextResponse.json(data)
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  await connectDB()
-  const { data } = await req.json()
-  const order = await CrewOrder.findOneAndUpdate(
-    { jobId: params.id },
-    { jobId: params.id, data },
-    { upsert: true, new: true }
-  ).lean()
-  return NextResponse.json(order)
+  const { data: body } = await req.json()
+  const { data, error } = await supabase
+    .from('crew_orders')
+    .upsert(
+      { job_id: params.id, data: body },
+      { onConflict: 'job_id' }
+    )
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }

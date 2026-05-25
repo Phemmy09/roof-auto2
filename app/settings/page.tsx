@@ -1,13 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { IFormula } from '@/types'
-import { RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { RefreshCw, Trash2 } from 'lucide-react'
+
+interface Formula {
+  id: string
+  name: string
+  item_name: string
+  formula_expr: string
+  unit: string
+  default_color: string
+  default_size: string
+  category: string
+  active: boolean
+  sort_order: number
+}
 
 const TEST_MEASUREMENTS = { squares: 18.33, pitch: 4, ridges: 48.1, hips: 4.6, valleys: 0, rakes: 75.6, eaves: 104.3, pipe_boots: 3, vents: 4 }
 
 export default function SettingsPage() {
-  const [formulas, setFormulas] = useState<IFormula[]>([])
+  const [formulas, setFormulas] = useState<Formula[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
 
@@ -73,16 +85,16 @@ export default function SettingsPage() {
             </thead>
             <tbody>
               {formulas.map((f) => (
-                <tr key={f._id} className="border-b last:border-0 hover:bg-gray-50">
+                <tr key={f.id} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{f.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{f.itemName}</td>
-                  <td className="px-4 py-3 font-mono text-xs bg-gray-50">{f.formulaExpr}</td>
+                  <td className="px-4 py-3 text-gray-600">{f.item_name}</td>
+                  <td className="px-4 py-3 font-mono text-xs bg-gray-50">{f.formula_expr}</td>
                   <td className="px-4 py-3 text-gray-500">{f.unit}</td>
                   <td className="px-4 py-3 text-gray-500">{f.category}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <button onClick={() => handlePreview(f.formulaExpr)} className="text-xs text-brand hover:underline">Preview</button>
-                      <button onClick={() => handleDelete(f._id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                      <button onClick={() => handlePreview(f.formula_expr)} className="text-xs text-brand hover:underline">Preview</button>
+                      <button onClick={() => handleDelete(f.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
